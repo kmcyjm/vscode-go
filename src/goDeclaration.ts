@@ -27,6 +27,7 @@ import { killProcessTree } from './utils/processUtils';
 
 const missingToolMsg = 'Missing tool: ';
 
+// info regarding where the definition is at 
 export interface GoDefinitionInformation {
 	file: string;
 	line: number;
@@ -37,6 +38,7 @@ export interface GoDefinitionInformation {
 	toolUsed: string;
 }
 
+// input to the "Go to definition"
 interface GoDefinitionInput {
 	document: vscode.TextDocument;
 	position: vscode.Position;
@@ -102,14 +104,20 @@ export function adjustWordPosition(
 	document: vscode.TextDocument,
 	position: vscode.Position
 ): [boolean, string, vscode.Position] {
+	// getWordRangeAtPosition() gets the range of the word
 	const wordRange = document.getWordRangeAtPosition(position);
+	// get the text of the line where the word is at
 	const lineText = document.lineAt(position.line).text;
+	// get the text of the word
 	const word = wordRange ? document.getText(wordRange) : '';
 	if (
 		!wordRange ||
+		// here we need to decide if the line is a comment
+		// that's why we need to obtain the lineText
 		lineText.startsWith('//') ||
 		isPositionInString(document, position) ||
 		word.match(/^\d+.?\d+$/) ||
+		// if the word is amongst the Go keywords
 		goKeywords.indexOf(word) > 0
 	) {
 		return [false, null, null];
@@ -357,14 +365,14 @@ export function parseMissingError(err: any): [boolean, string] {
 	}
 	return [false, null];
 }
-
+// DefinitionProvider is an interface
 export class GoDefinitionProvider implements vscode.DefinitionProvider {
 	private goConfig: vscode.WorkspaceConfiguration = null;
 
 	constructor(goConfig?: vscode.WorkspaceConfiguration) {
 		this.goConfig = goConfig;
 	}
-
+	// provideDefinition returns 
 	public provideDefinition(
 		document: vscode.TextDocument,
 		position: vscode.Position,
@@ -375,6 +383,7 @@ export class GoDefinitionProvider implements vscode.DefinitionProvider {
 				if (definitionInfo == null || definitionInfo.file == null) {
 					return null;
 				}
+				// Uri.file returns a Uri
 				const definitionResource = vscode.Uri.file(definitionInfo.file);
 				const pos = new vscode.Position(definitionInfo.line, definitionInfo.column);
 				return new vscode.Location(definitionResource, pos);
