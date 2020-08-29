@@ -69,16 +69,31 @@ export function definitionLocation(
 	token: vscode.CancellationToken
 ): Promise<GoDefinitionInformation> {
 	const adjustedPos = adjustWordPosition(document, position);
+	// if adjustedPos[0] === false, meaning wordRange is not found
 	if (!adjustedPos[0]) {
+		// Promise.resolve() method returns a Promise object that is resolved with a given value (ie. null)
+		/*
+		Promise.resolve('Success').then(function(value) {
+  			console.log(value); // "Success"
+		}, function(value) {
+  			// not called
+		});*/
 		return Promise.resolve(null);
 	}
+	// the text of a word
 	const word = adjustedPos[1];
+	// the position where the 'Go to Definition' is intiated
+	// usually equals to the cursor position
 	position = adjustedPos[2];
 
 	if (!goConfig) {
+		// get the Go configs relating to the current document
 		goConfig = getGoConfig(document.uri);
 	}
+	// we need to know what tool is being used to generate Go docs
+	// Godoc or Gogetdoc or Guru
 	const toolForDocs = goConfig['docsTool'] || 'godoc';
+	// get module folder path?
 	return getModFolderPath(document.uri).then((modFolderPath) => {
 		const input: GoDefinitionInput = {
 			document,
@@ -122,13 +137,15 @@ export function adjustWordPosition(
 	) {
 		return [false, null, null];
 	}
+	// if current cursor is at the end of the word and is after the start of the word
+	// move the cursor to the left one character
 	if (position.isEqual(wordRange.end) && position.isAfter(wordRange.start)) {
 		position = position.translate(0, -1);
 	}
 
 	return [true, word, position];
 }
-
+// Go import pattern
 const godefImportDefinitionRegex = /^import \(.* ".*"\)$/;
 function definitionLocation_godef(
 	input: GoDefinitionInput,
@@ -140,6 +157,7 @@ function definitionLocation_godef(
 	if (!path.isAbsolute(godefPath)) {
 		return Promise.reject(missingToolMsg + godefTool);
 	}
+	// the offset of position in document
 	const offset = byteOffsetAt(input.document, input.position);
 	const env = toolExecutionEnvironment();
 	env['GOROOT'] = getCurrentGoRoot();
@@ -378,6 +396,8 @@ export class GoDefinitionProvider implements vscode.DefinitionProvider {
 		position: vscode.Position,
 		token: vscode.CancellationToken
 	): Thenable<vscode.Location> {
+		// definitionLocation() returns 'definitionInformation' in definitionLocation_godef()
+		// definitionInformation is of type of GoDefinitionInformation interface
 		return definitionLocation(document, position, this.goConfig, false, token).then(
 			(definitionInfo) => {
 				if (definitionInfo == null || definitionInfo.file == null) {
