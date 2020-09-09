@@ -146,6 +146,10 @@ export function adjustWordPosition(
 	return [true, word, position];
 }
 // Go import pattern
+// import (
+//     . "math"
+//     "fmt"
+// )
 const godefImportDefinitionRegex = /^import \(.* ".*"\)$/;
 function definitionLocation_godef(
 	input: GoDefinitionInput,
@@ -162,6 +166,8 @@ function definitionLocation_godef(
 	const env = toolExecutionEnvironment();
 	env['GOROOT'] = getCurrentGoRoot();
 	let p: cp.ChildProcess;
+	// pass this token part first
+	// used to kill child process
 	if (token) {
 		token.onCancellationRequested(() => killProcessTree(p));
 	}
@@ -199,26 +205,41 @@ function definitionLocation_godef(
 				}
 				const result = stdout.toString();
 				const lines = result.split('\n');
+				// lines[0] = "/Users/jiaming/Documents/gitrepos/fzf/src/ansi.go:64:6"
 				let match = /(.*):(\d+):(\d+)/.exec(lines[0]);
+				// if no match, meaning the defintioin is not found in any file
 				if (!match) {
 					// TODO: Gotodef on pkg name:
 					// /usr/local/go/src/html/template\n
 					return resolve(null);
 				}
+				// _ is the whole string
+				// [
+				//	"/Users/jiaming/Documents/gitrepos/fzf/src/ansi.go:64:6",
+				//	"/Users/jiaming/Documents/gitrepos/fzf/src/ansi.go",
+				//	"64",
+				// 	"6"
+				// 	]
 				const [_, file, line, col] = match;
+				// path is a library
+				// pkgPath = "/Users/jiaming/Documents/gitrepos/fzf/src"
 				const pkgPath = path.dirname(file);
 				const definitionInformation: GoDefinitionInformation = {
 					file,
 					line: +line - 1,
 					column: +col - 1,
+					// "toAnsiString func(color Color, offset int) string"
 					declarationlines: lines.slice(1),
 					toolUsed: 'godef',
 					doc: null,
 					name: null
 				};
+				// includeDocs is false or declaration line match the import regex
+				// if we don't need to include documentation in the result, we will just return the result w/o doc
 				if (!input.includeDocs || godefImportDefinitionRegex.test(definitionInformation.declarationlines[0])) {
 					return resolve(definitionInformation);
 				}
+				// if includeDocs is true
 				match = /^\w+ \(\*?(\w+)\)/.exec(lines[1]);
 				runGodoc(input.cwd, pkgPath, match ? match[1] : '', input.word, token)
 					.then((doc) => {
